@@ -20,7 +20,7 @@ Avoidable DMG: Lilputo-Shadowmoon (454.25K)
 
 ## Commands
 - `/lilmvp` – post to party (instance chat in a group-finder group)
-- `/lilmvp preview` – show it only in your own chat
+- `/lilmvp preview` – show it only in your own chat (names class-colored; Lilputo in paladin pink)
 - `/lilmvp say` / `party` / `instance` – post to that channel
 - `/lilmvp auto` – toggle auto-post when a Mythic+ key finishes (off by default, saved)
 

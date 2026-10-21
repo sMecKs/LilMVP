@@ -21,6 +21,14 @@ local LINES = {
 }
 
 local LINE_DELAY = 0.2   -- seconds between lines
+
+-- Class colors used ONLY by /lilmvp preview (your own chat frame).
+-- Posted lines stay plain text. Use the class token (e.g. "PALADIN"),
+-- or nil to look it up from your group (falls back to white).
+local NAME_CLASSES = {
+    ["Lilputo-Shadowmoon"] = "PALADIN",
+    ["Kimk-Shadowmoon"]    = nil,
+}
 ---------------------------------------------------------------------------
 
 local ADDON = ...
@@ -112,9 +120,39 @@ local function Post(channel)
     SendNext()
 end
 
+local function GroupClassOf(fullName)
+    local short = fullName:match("^([^%-]+)")
+    local units = { "player" }
+    for i = 1, 4 do units[#units + 1] = "party" .. i end
+    for i = 1, 40 do units[#units + 1] = "raid" .. i end
+    for _, u in ipairs(units) do
+        if UnitExists(u) then
+            local n, r = UnitName(u)
+            if n == short and (not r or r == "" or fullName == n .. "-" .. r) then
+                local _, token = UnitClass(u)
+                return token
+            end
+        end
+    end
+end
+
+local function ColorName(fullName)
+    local token = NAME_CLASSES[fullName] or GroupClassOf(fullName)
+    local c = token and RAID_CLASS_COLORS and RAID_CLASS_COLORS[token]
+    if not c then
+        if token == "PALADIN" then return "|cfff48cba" .. fullName .. "|r" end
+        return fullName
+    end
+    return string.format("|cff%02x%02x%02x%s|r", c.r * 255, c.g * 255, c.b * 255, fullName)
+end
+
 local function Preview()
     for _, line in ipairs(LINES) do
-        DEFAULT_CHAT_FRAME:AddMessage(line)
+        local colored = line:gsub("([%a]+%-[%a]+)", function(name)
+            if name:find("DungeonData") then return name end
+            return ColorName(name)
+        end)
+        DEFAULT_CHAT_FRAME:AddMessage(colored)
     end
 end
 
