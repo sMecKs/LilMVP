@@ -1,0 +1,9 @@
+## Interface: 120100
+## Title: LilMVP
+## Notes: Joke end-of-key summary posted to party/instance chat. /lilmvp
+## Author: sMecKs
+## Version: 1.0.0
+## SavedVariables: LilMVPDB
+## DefaultState: enabled
+
+LilMVP.lua
