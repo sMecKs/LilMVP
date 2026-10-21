@@ -5,11 +5,11 @@ A joke WoW Retail (Midnight) addon that posts a fake end-of-key "dungeon data" s
 ```
 ********sMecKsDungeonData Addon********
 MVP: Lilputo-Shadowmoon
-Top DMG: Lilputo-Shadowmoon (363.00M)
+Top DMG: Lilputo-Shadowmoon (512.87M)
 Top Healing: Kimk-Shadowmoon (194.04M)
-Top Interrupts: Lilputo-Shadowmoon (36)
+Top Interrupts: Lilputo-Shadowmoon (58)
 Top Dispels: Kimk-Shadowmoon (45)
-Avoidable DMG: Lilputo-Shadowmoon (454.25K)
+Avoidable DMG: Lilputo-Shadowmoon (12.48K)
 ************************************************
 ```
 
