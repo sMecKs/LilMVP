@@ -28,3 +28,8 @@ If you're in combat, it waits and posts once combat ends.
 
 ## Edit the text
 Open `LilMVP/LilMVP.lua` and change the `LINES` table at the top.
+
+
+## 1.1 changes
+- All lines post instantly from `/lilmvp` (WoW blocks addon chat sent on a delay, which caused "Interface action failed because of an AddOn").
+- `/lilmvp auto` now pops up a **Post LilMVP** button when a Mythic+ key completes; click it to post (right-click to dismiss). `/lilmvp button` shows it any time.

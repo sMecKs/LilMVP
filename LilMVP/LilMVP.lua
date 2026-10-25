@@ -1,13 +1,16 @@
 -- LilMVP: joke "dungeon summary" poster.
--- /lilmvp                 post to party (or instance chat in an instance group)
+-- /lilmvp                 post to your group (instance / raid / party chat)
 -- /lilmvp preview         print only to your own chat frame
 -- /lilmvp say|party|instance  post to that channel
--- /lilmvp auto            toggle auto-post when a Mythic+ key completes (off by default)
+-- /lilmvp auto            toggle a "Post LilMVP" button that pops up when a Mythic+ key completes
+--
+-- WoW only lets addons send chat right when you press a key or click a button,
+-- so every line is sent at once from the slash command or the button click.
 
 ---------------------------------------------------------------------------
 -- EDIT HERE: the lines that get posted, top to bottom.
--- Keep each line under 255 characters (WoW chat limit). No color codes:
--- chat strips them, and group members' names get class-colored on their own.
+-- Keep each line under 255 characters. No color codes: chat strips them,
+-- and group members' names get class-colored on their own.
 ---------------------------------------------------------------------------
 local LINES = {
     "********sMecKsDungeonData Addon********",
@@ -20,22 +23,15 @@ local LINES = {
     "************************************************",
 }
 
-local LINE_DELAY = 0.2   -- seconds between lines
-
 -- Class colors used ONLY by /lilmvp preview (your own chat frame).
--- Posted lines stay plain text. Use the class token (e.g. "PALADIN"),
--- or nil to look it up from your group (falls back to white).
 local NAME_CLASSES = {
     ["Lilputo-Shadowmoon"] = "PALADIN",
-    ["Kimk-Shadowmoon"]    = nil,
+    ["Kimk-Shadowmoon"]    = nil,   -- nil = look it up from your group
 }
 ---------------------------------------------------------------------------
 
 local ADDON = ...
 local PREFIX = "|cff33ff99LilMVP|r: "
-local queue = {}          -- pending lines: { text, channel }
-local sending = false
-local pendingAfterCombat = false
 
 local function Print(msg)
     DEFAULT_CHAT_FRAME:AddMessage(PREFIX .. tostring(msg))
@@ -56,49 +52,15 @@ local function ValidChannel(ch)
     return false
 end
 
-local function CombatBlocked()
-    return InCombatLockdown() or UnitAffectingCombat("player")
-end
-
-local SendNext -- forward
-
-local function TrySend(text, channel)
-    local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
-    local ok, err = pcall(send, text, channel)
-    return ok, err
-end
-
-SendNext = function()
-    if #queue == 0 then
-        sending = false
-        return
-    end
-    if CombatBlocked() then
-        -- Midnight may restrict addon chat in combat inside instances: wait.
-        sending = false
-        if not pendingAfterCombat then
-            pendingAfterCombat = true
-            Print("In combat - will post when combat ends.")
-        end
-        return
-    end
-    local item = queue[1]
-    local ok = TrySend(item[1], item[2])
-    if not ok then
-        -- Leave the line queued and retry after combat / shortly.
-        sending = false
-        pendingAfterCombat = true
-        Print("Chat send blocked - will retry after combat.")
-        return
-    end
-    table.remove(queue, 1)
-    if #queue > 0 then
-        C_Timer.After(LINE_DELAY, SendNext)
+local function Send(text, channel)
+    if C_ChatInfo and C_ChatInfo.SendChatMessage then
+        C_ChatInfo.SendChatMessage(text, channel)
     else
-        sending = false
+        SendChatMessage(text, channel)
     end
 end
 
+-- Must be called directly from a keypress (slash command) or a button click.
 local function Post(channel)
     channel = channel or DefaultChannel()
     if not channel then
@@ -109,15 +71,9 @@ local function Post(channel)
         Print("Can't post to " .. channel .. " right now.")
         return
     end
-    if #queue > 0 then
-        Print("Already posting, hold on.")
-        return
-    end
     for _, line in ipairs(LINES) do
-        queue[#queue + 1] = { string.sub(line, 1, 254), channel }
+        Send(string.sub(line, 1, 254), channel)
     end
-    sending = true
-    SendNext()
 end
 
 local function GroupClassOf(fullName)
@@ -156,24 +112,40 @@ local function Preview()
     end
 end
 
+-- Pop-up button shown after a key completes (auto mode). Clicking it posts.
+local button = CreateFrame("Button", "LilMVPPostButton", UIParent, "UIPanelButtonTemplate")
+button:SetSize(160, 32)
+button:SetPoint("CENTER", UIParent, "CENTER", 0, 200)
+button:SetText("Post LilMVP")
+button:SetMovable(true)
+button:EnableMouse(true)
+button:RegisterForDrag("LeftButton")
+button:SetScript("OnDragStart", button.StartMoving)
+button:SetScript("OnDragStop", button.StopMovingOrSizing)
+button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+button:SetScript("OnClick", function(self, mouse)
+    if mouse == "LeftButton" then Post() end
+    self:Hide()
+end)
+button:Hide()
+
+local hideTimer
+local function ShowButton()
+    button:Show()
+    Print("Key done! Click the Post LilMVP button (right-click to dismiss).")
+    if hideTimer then hideTimer:Cancel() end
+    hideTimer = C_Timer.NewTimer(120, function() button:Hide() end)
+end
+
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
-frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 frame:RegisterEvent("CHALLENGE_MODE_COMPLETED")
 frame:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" and arg1 == ADDON then
         LilMVPDB = LilMVPDB or {}
         if LilMVPDB.auto == nil then LilMVPDB.auto = false end
-    elseif event == "PLAYER_REGEN_ENABLED" then
-        if pendingAfterCombat and #queue > 0 and not sending then
-            pendingAfterCombat = false
-            sending = true
-            C_Timer.After(1, SendNext)
-        end
     elseif event == "CHALLENGE_MODE_COMPLETED" then
-        if LilMVPDB and LilMVPDB.auto then
-            C_Timer.After(2, function() Post() end)
-        end
+        if LilMVPDB and LilMVPDB.auto then ShowButton() end
     end
 end)
 
@@ -192,8 +164,10 @@ SlashCmdList.LILMVP = function(msg)
         Post("INSTANCE_CHAT")
     elseif msg == "auto" then
         LilMVPDB.auto = not LilMVPDB.auto
-        Print("Auto-post on key completion: " .. (LilMVPDB.auto and "ON" or "OFF"))
+        Print("Post button after a key: " .. (LilMVPDB.auto and "ON" or "OFF"))
+    elseif msg == "button" then
+        ShowButton()
     else
-        Print("/lilmvp | preview | say | party | instance | auto")
+        Print("/lilmvp | preview | say | party | instance | auto | button")
     end
 end
