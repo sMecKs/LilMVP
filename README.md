@@ -33,3 +33,8 @@ Open `LilMVP/LilMVP.lua` and change the `LINES` table at the top.
 ## 1.1 changes
 - All lines post instantly from `/lilmvp` (WoW blocks addon chat sent on a delay, which caused "Interface action failed because of an AddOn").
 - `/lilmvp auto` now pops up a **Post LilMVP** button when a Mythic+ key completes; click it to post (right-click to dismiss). `/lilmvp button` shows it any time.
+
+## 1.2 changes
+- WoW Midnight blocks more than one addon chat message per keypress or click, which caused "Interface action failed because of an AddOn".
+- Each `/lilmvp` (or `/lilmvp party`, etc.) or click on the **Post LilMVP (n/8)** button now sends the next line. Click it 8 times for the full box. Right-click cancels.
+- If WoW is locking addon chat (active key, boss fight, combat in an instance), it tells you instead of erroring.

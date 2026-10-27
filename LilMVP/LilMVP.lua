@@ -4,8 +4,8 @@
 -- /lilmvp say|party|instance  post to that channel
 -- /lilmvp auto            toggle a "Post LilMVP" button that pops up when a Mythic+ key completes
 --
--- WoW only lets addons send chat right when you press a key or click a button,
--- so every line is sent at once from the slash command or the button click.
+-- WoW Midnight allows one addon chat line per keypress/click, so each
+-- /lilmvp or button click sends the next line (8 clicks for the whole box).
 
 ---------------------------------------------------------------------------
 -- EDIT HERE: the lines that get posted, top to bottom.
@@ -60,8 +60,53 @@ local function Send(text, channel)
     end
 end
 
--- Must be called directly from a keypress (slash command) or a button click.
+-- WoW (Midnight) only allows ONE addon chat message per keypress or click,
+-- and none at all while chat is locked down (active key, boss fight, combat
+-- in an instance). So each press/click sends the next line.
+local queue, queueChannel, queueIndex = nil, nil, 0
+local button -- created below
+
+local function ChatLocked()
+    if C_ChatInfo and C_ChatInfo.InChatMessagingLockdown then
+        local locked = C_ChatInfo.InChatMessagingLockdown()
+        return locked
+    end
+    return false
+end
+
+local function UpdateButton()
+    if not button then return end
+    if queue and queueIndex <= #queue then
+        button:SetText(string.format("Post LilMVP (%d/%d)", queueIndex, #queue))
+        button:Show()
+    else
+        button:SetText("Post LilMVP")
+    end
+end
+
+-- Sends exactly one line. Must be called from a slash command or a click.
+local function SendNext()
+    if not queue or queueIndex > #queue then return false end
+    if ChatLocked() then
+        Print("WoW is blocking addon chat right now (key/boss/combat). Try again once it ends.")
+        return false
+    end
+    Send(string.sub(queue[queueIndex], 1, 254), queueChannel)
+    queueIndex = queueIndex + 1
+    if queueIndex > #queue then
+        queue = nil
+        if button then button:SetText("Post LilMVP"); button:Hide() end
+        return true
+    end
+    UpdateButton()
+    return true
+end
+
 local function Post(channel)
+    if queue then -- already posting: just send the next line
+        SendNext()
+        return
+    end
     channel = channel or DefaultChannel()
     if not channel then
         Print("You're not in a group. Use /lilmvp say or /lilmvp preview.")
@@ -71,8 +116,14 @@ local function Post(channel)
         Print("Can't post to " .. channel .. " right now.")
         return
     end
-    for _, line in ipairs(LINES) do
-        Send(string.sub(line, 1, 254), channel)
+    if ChatLocked() then
+        Print("WoW is blocking addon chat right now (key/boss/combat). Try again once it ends.")
+        return
+    end
+    queue, queueChannel, queueIndex = LINES, channel, 1
+    SendNext()
+    if queue then
+        Print("Keep clicking the Post LilMVP button (or type /lilmvp) to send the rest.")
     end
 end
 
@@ -113,7 +164,7 @@ local function Preview()
 end
 
 -- Pop-up button shown after a key completes (auto mode). Clicking it posts.
-local button = CreateFrame("Button", "LilMVPPostButton", UIParent, "UIPanelButtonTemplate")
+button = CreateFrame("Button", "LilMVPPostButton", UIParent, "UIPanelButtonTemplate")
 button:SetSize(160, 32)
 button:SetPoint("CENTER", UIParent, "CENTER", 0, 200)
 button:SetText("Post LilMVP")
@@ -124,8 +175,13 @@ button:SetScript("OnDragStart", button.StartMoving)
 button:SetScript("OnDragStop", button.StopMovingOrSizing)
 button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 button:SetScript("OnClick", function(self, mouse)
-    if mouse == "LeftButton" then Post() end
-    self:Hide()
+    if mouse == "LeftButton" then
+        Post()
+    else
+        queue = nil
+        self:SetText("Post LilMVP")
+        self:Hide()
+    end
 end)
 button:Hide()
 
@@ -134,7 +190,9 @@ local function ShowButton()
     button:Show()
     Print("Key done! Click the Post LilMVP button (right-click to dismiss).")
     if hideTimer then hideTimer:Cancel() end
-    hideTimer = C_Timer.NewTimer(120, function() button:Hide() end)
+    hideTimer = C_Timer.NewTimer(120, function()
+        if not queue then button:Hide() end
+    end)
 end
 
 local frame = CreateFrame("Frame")
